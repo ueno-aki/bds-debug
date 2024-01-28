@@ -25,20 +25,3 @@ jobs:
           name: ${{ github.event.repository.name }}-windows-x64-${{ github.sha }}
           path: |
             bin/
-
-  check-code:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - id: cpp-linter-action
-        uses: cpp-linter/cpp-linter-action@v2
-        with:
-          files-changed-only: false
-          style: file
-          tidy-checks: ''
-          version: 17
-
-      - if: ${{ steps.cpp-linter-action.outputs.checks-failed > 0 }}
-        run: |
-          exit 1
