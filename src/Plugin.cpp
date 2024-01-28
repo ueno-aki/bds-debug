@@ -1,6 +1,15 @@
 #include "Plugin.h"
 
+#include <utility>
+
+#include <ll/api/command/DynamicCommand.h>
 #include <ll/api/plugin/NativePlugin.h>
+#include <ll/api/service/Bedrock.h>
+#include <mc/entity/utilities/ActorType.h>
+#include <mc/server/commands/CommandOrigin.h>
+#include <mc/server/commands/CommandOutput.h>
+#include <mc/server/commands/CommandPermissionLevel.h>
+#include <mc/world/actor/player/Player.h>
 
 namespace plugin {
 
@@ -19,9 +28,36 @@ Plugin::Plugin(ll::plugin::NativePlugin& self) : mSelf(self) {
 ll::plugin::NativePlugin& Plugin::getSelf() const { return mSelf; }
 
 bool Plugin::enable() {
-    mSelf.getLogger().info("enabling...");
+    auto& logger = mSelf.getLogger();
 
-    // Code for enabling the plugin goes here.
+    // ...
+
+    // Register commands.
+    auto commandRegistry = ll::service::getCommandRegistry();
+    if (!commandRegistry) {
+        throw std::runtime_error("failed to get command registry");
+    }
+
+    auto command =
+        DynamicCommand::createCommand(commandRegistry, "suicide", "Commits suicide.", CommandPermissionLevel::Any);
+    command->addOverload();
+    command->setCallback(
+        [&logger](DynamicCommand const&, CommandOrigin const& origin, CommandOutput& output, std::unordered_map<std::string, DynamicCommand::Result>&) {
+            auto* entity = origin.getEntity();
+            if (entity == nullptr || !entity->isType(ActorType::Player)) {
+                output.error("Only players can commit suicide");
+                return;
+            }
+
+            auto* player = static_cast<Player*>(entity);
+            player->kill();
+
+            logger.info("{} killed themselves", player->getRealName());
+        }
+    );
+    DynamicCommand::setup(commandRegistry, std::move(command));
+
+    // ...
 
     return true;
 }
@@ -29,7 +65,13 @@ bool Plugin::enable() {
 bool Plugin::disable() {
     mSelf.getLogger().info("disabling...");
 
-    // Code for disabling the plugin goes here.
+    // Unregister commands.
+    auto commandRegistry = ll::service::getCommandRegistry();
+    if (!commandRegistry) {
+        throw std::runtime_error("failed to get command registry");
+    }
+
+    commandRegistry->unregisterCommand("suicide");
 
     return true;
 }
